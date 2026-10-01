@@ -1,0 +1,400 @@
+/* ============================================================
+   custom.css — Kasir Toko POS
+   Tambahan style non-Tailwind
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+* {
+    font-family: 'Inter', sans-serif;
+    box-sizing: border-box;
+}
+
+:root {
+    --sidebar-bg: #4DB9F2;
+    --sidebar-hover: rgba(255,255,255,0.2);
+    --sidebar-active: rgba(255,255,255,0.95);
+    --accent-blue: #4DB9F2;
+    --accent-green: #22c55e;
+    --accent-red: #ef4444;
+    --accent-orange: #f97316;
+    --accent-yellow: #eab308;
+    --bg-page: #E5E5E5;
+}
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ---- Sidebar ---- */
+.sidebar {
+    background: var(--sidebar-bg);
+    width: 220px;
+    min-height: 100vh;
+    position: fixed;
+    left: 0; top: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 15px rgba(77,185,242,0.25);
+    transition: width 0.28s cubic-bezier(.4,0,.2,1), transform 0.28s cubic-bezier(.4,0,.2,1);
+    overflow: hidden;
+}
+
+/* Desktop collapsed: icon-only mode */
+.sidebar.collapsed {
+    width: 64px;
+}
+.sidebar.collapsed .sidebar-label,
+.sidebar.collapsed .sidebar-brand-text,
+.sidebar.collapsed .sidebar-logout-text {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.sidebar.collapsed .sidebar-nav a {
+    justify-content: center;
+    padding: 12px 0;
+    margin: 2px 8px;
+}
+.sidebar.collapsed .sidebar-brand {
+    justify-content: center;
+    padding: 16px 0;
+}
+.sidebar.collapsed .sidebar-logout {
+    justify-content: center;
+    padding: 12px 0;
+}
+
+.sidebar-nav a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    color: rgba(255,255,255,0.85);
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 10px;
+    margin: 2px 10px;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+.sidebar-nav a:hover {
+    background: var(--sidebar-hover);
+    color: #fff;
+}
+.sidebar-nav a.active {
+    background: var(--sidebar-active);
+    color: #1e3a5f;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.sidebar-nav a svg {
+    width: 18px; height: 18px; flex-shrink: 0;
+}
+
+/* ---- Main Content ---- */
+.main-content {
+    margin-left: 220px;
+    min-height: 100vh;
+    background: var(--bg-page);
+    padding: 24px;
+    transition: margin-left 0.28s cubic-bezier(.4,0,.2,1);
+}
+.main-content.sidebar-collapsed {
+    margin-left: 64px;
+}
+
+/* ---- Hamburger Button ---- */
+.hamburger-btn {
+    position: fixed;
+    top: 14px;
+    left: 174px;
+    z-index: 200;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.2);
+    border: none;
+    cursor: pointer;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 4px;
+    transition: left 0.28s cubic-bezier(.4,0,.2,1), background 0.2s;
+    backdrop-filter: blur(4px);
+}
+.hamburger-btn:hover { background: rgba(255,255,255,0.35); }
+.hamburger-btn .bar {
+    display: block;
+    width: 16px; height: 2px;
+    background: #fff;
+    border-radius: 2px;
+    transition: all 0.25s ease;
+    transform-origin: center;
+}
+.hamburger-btn.is-collapsed { left: 18px; }
+/* X animation when expanded → collapse (not needed here, keep 3-bar) */
+
+/* ---- Sidebar Overlay (mobile) ---- */
+.sidebar-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 99;
+    animation: fadeIn 0.2s ease;
+}
+.sidebar-overlay.active { display: block; }
+
+/* ---- Stat Cards ---- */
+.stat-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+}
+
+/* ---- Badges ---- */
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+.badge-pending  { background: #fef3c7; color: #92400e; }
+.badge-complete { background: #dcfce7; color: #166534; }
+.badge-cancel   { background: #fee2e2; color: #991b1b; }
+.badge-qris     { background: #dbeafe; color: #1e40af; }
+.badge-cash     { background: #dcfce7; color: #166534; }
+.badge-transfer { background: #f3e8ff; color: #6b21a8; }
+
+/* ---- POS Product Card ---- */
+.product-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    overflow: hidden;   /* clip overflowing children */
+    min-width: 0;       /* allow card to shrink in flex/grid */
+}
+.product-card * {
+    min-width: 0;       /* every descendant can shrink */
+}
+.product-card:hover {
+    border-color: var(--accent-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(77,185,242,0.20);
+}
+.product-card.out-of-stock {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.product-img {
+    width: 100%;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+    background: #f1f5f9;
+}
+.product-img-placeholder {
+    width: 100%;
+    height: 80px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+}
+
+/* ---- Cart ---- */
+.cart-item {
+    padding: 10px 0;
+    border-bottom: 1px solid #f1f5f9;
+    animation: slideIn 0.2s ease;
+}
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(10px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ---- Qty Counter ---- */
+.qty-btn {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    background: #f1f5f9;
+    cursor: pointer;
+    font-size: 0.9rem; font-weight: 700;
+    border: none;
+    transition: background 0.15s;
+    user-select: none;
+}
+.qty-btn:hover { background: var(--accent-blue); color: #fff; }
+
+/* ---- Modal ---- */
+.modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+    display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 0.2s ease;
+}
+.modal-box {
+    background: #fff;
+    border-radius: 20px;
+    padding: 32px;
+    max-width: 420px; width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    animation: scaleIn 0.25s ease;
+    position: relative;
+}
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { transform: scale(0.85); opacity:0; } to { transform:scale(1); opacity:1; } }
+
+/* ---- Chart Container ---- */
+.chart-container {
+    position: relative;
+    height: 200px;
+}
+
+/* ---- Table ---- */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+}
+.data-table thead th {
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #64748b;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: nowrap;
+}
+.data-table tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f8fafc;
+    color: #374151;
+    vertical-align: middle;
+}
+.data-table tbody tr:hover { background: #f8fafc; }
+
+/* ---- Input styles ---- */
+.input-field {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.input-field:focus { border-color: var(--accent-blue); }
+
+/* ---- Login Page ---- */
+.login-bg {
+    background: var(--sidebar-bg);
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+}
+.login-card {
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 40px 48px;
+    width: 400px;
+    max-width: 90vw;
+    border: 1px solid rgba(255,255,255,0.3);
+}
+.login-input {
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 50px;
+    border: none;
+    background: rgba(255,255,255,0.9);
+    font-size: 0.9rem;
+    outline: none;
+    color: #333;
+    margin-top: 6px;
+    transition: box-shadow 0.2s;
+}
+.login-input:focus { box-shadow: 0 0 0 3px rgba(255,255,255,0.4); }
+.login-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 50px;
+    border: none;
+    background: #374151;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    letter-spacing: 1px;
+    margin-top: 24px;
+    transition: background 0.2s, transform 0.1s;
+}
+.login-btn:hover  { background: #1f2937; }
+.login-btn:active { transform: scale(0.98); }
+
+/* ---- Tab System ---- */
+.tab-btn {
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    transition: all 0.2s;
+}
+.tab-btn.active {
+    background: #fff;
+    color: #1e3a5f;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+/* ---- Stock log item ---- */
+.stock-log-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.82rem;
+}
+
+/* ---- Notification dot ---- */
+.notif-dot {
+    width: 8px; height: 8px;
+    background: #ef4444;
+    border-radius: 50%;
+    display: inline-block;
+    animation: pulse 1.5s ease infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 768px) {
+    .sidebar { transform: translateX(-220px); width: 220px !important; }
+    .sidebar.mobile-open { transform: translateX(0); }
+    .main-content { margin-left: 0 !important; padding: 16px; }
+    .hamburger-btn { left: 14px !important; top: 14px; }
+    .hamburger-btn.is-collapsed { left: 14px !important; }
+}
