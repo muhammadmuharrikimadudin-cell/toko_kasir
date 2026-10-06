@@ -187,11 +187,7 @@
     transition: all 0.2s ease;
     border: 2px solid transparent;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    overflow: hidden;   /* clip overflowing children */
-    min-width: 0;       /* allow card to shrink in flex/grid */
-}
-.product-card * {
-    min-width: 0;       /* every descendant can shrink */
+    overflow: hidden;
 }
 .product-card:hover {
     border-color: var(--accent-blue);

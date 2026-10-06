@@ -324,8 +324,10 @@ async function checkLockStatus() {
 /* -------------------------------------------------------
    Render action bar (bottom of card)
 ------------------------------------------------------- */
-function renderActionBar() {
+function renderActionBar(allIndivLocked = false) {
     const bar = document.getElementById('attendanceActionBar');
+
+    // Prioritas 1: global lock (admin sudah klik Simpan Absensi)
     if (todayLocked) {
         bar.innerHTML = `
             <span class="badge-day-locked">
@@ -341,31 +343,50 @@ function renderActionBar() {
                 Edit Absensi (Admin)
             </button>` : ''}
         `;
+        return;
+    }
+
+    // Prioritas 2: semua karyawan sudah diinput secara per-individu
+    if (allIndivLocked) {
+        bar.innerHTML = `
+            <button class="save-attendance-btn" disabled style="opacity:.65;cursor:not-allowed;">
+                <svg style="width:15px;height:15px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                </svg>
+                ✓ Absensi Hari Ini Sudah Selesai &amp; Terkunci
+            </button>
+            ${IS_ADMIN ? `<button class="unlock-attendance-btn" onclick="unlockAttendance()" id="btn-unlock-attendance">
+                <svg style="width:14px;height:14px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+                </svg>
+                Edit Absensi (Admin)
+            </button>` : ''}
+        `;
+        return;
+    }
+
+    // Prioritas 3: belum semua terkunci
+    if (IS_ADMIN) {
+        bar.innerHTML = `
+            <button class="save-attendance-btn" onclick="saveAttendance()" id="btn-save-attendance">
+                <svg style="width:15px;height:15px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                </svg>
+                Simpan Absensi Hari Ini
+            </button>
+        `;
     } else {
-        // Hanya admin yang bisa simpan/kunci absensi
-        if (IS_ADMIN) {
-            bar.innerHTML = `
-                <button class="save-attendance-btn" onclick="saveAttendance()" id="btn-save-attendance">
-                    <svg style="width:15px;height:15px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
-                    </svg>
-                    Simpan Absensi Hari Ini
-                </button>
-            `;
-        } else {
-            // Karyawan: tampilkan info saja, tanpa tombol simpan
-            bar.innerHTML = `
-                <span style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:12px;
-                             background:#f9fafb;color:#9ca3af;font-size:13px;font-weight:600;
-                             border:1.5px dashed #d1d5db;cursor:default;">
-                    <svg style="width:14px;height:14px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                    </svg>
-                    Hanya Admin yang Dapat Menyimpan Absensi
-                </span>
-            `;
-        }
+        bar.innerHTML = `
+            <span style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:12px;
+                         background:#f9fafb;color:#9ca3af;font-size:13px;font-weight:600;
+                         border:1.5px dashed #d1d5db;cursor:default;">
+                <svg style="width:14px;height:14px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+                Hanya Admin yang Dapat Menyimpan Absensi
+            </span>
+        `;
     }
 }
 
@@ -455,20 +476,31 @@ function renderEmployees(employees) {
             <p class="text-3xl mb-2">👥</p>
             <p>Belum ada data karyawan</p>
         </td></tr>`;
+        renderActionBar(false);
         return;
     }
+
+    // Cek apakah SEMUA karyawan sudah terkunci (per-individu)
+    const allIndivLocked = employees.length > 0 && employees.every(e => e.is_locked === true);
+
+    const lockIcon = `<svg style="width:12px;height:12px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Absensi dikunci">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+    </svg>`;
+
     tbody.innerHTML = employees.map((emp, i) => {
-        const attStatus = emp.attendance_status;
-        // If today is locked, show static badge instead of buttons
+        const attStatus  = emp.attendance_status;
+        const isEmpLocked = emp.is_locked === true || todayLocked;
+
         let detailCell;
-        if (todayLocked) {
+        if (isEmpLocked) {
+            // Tampilkan badge statis — tidak bisa diklik
             let badge;
             if (attStatus === 'Present') {
-                badge = `<span class="badge-locked-present">✓ Present</span>`;
+                badge = `<span class="badge-locked-present">✓ Absen Terkunci ${lockIcon}</span>`;
             } else if (attStatus === 'Absent') {
-                badge = `<span class="badge-locked-absent">✗ Absent</span>`;
+                badge = `<span class="badge-locked-absent">✗ Absent ${lockIcon}</span>`;
             } else {
-                badge = `<span class="badge-locked-none">— Belum diisi</span>`;
+                badge = `<span class="badge-locked-none">— Belum diisi ${lockIcon}</span>`;
             }
             detailCell = `
                 <div class="flex items-center gap-2 justify-center" style="flex-wrap:nowrap">
@@ -477,11 +509,9 @@ function renderEmployees(employees) {
                         Delete
                     </button>` : ''}
                     ${badge}
-                    <svg style="width:13px;height:13px;color:#9ca3af;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Absensi dikunci">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                    </svg>
                 </div>`;
         } else {
+            // Tampilkan tombol Present / Absent
             detailCell = `
                 <div class="flex items-center gap-2 justify-center" style="flex-wrap:nowrap">
                     ${IS_ADMIN ? `<button onclick="deleteEmployee(${emp.id}, '${emp.nama}')"
@@ -522,6 +552,9 @@ function renderEmployees(employees) {
             <td style="text-align:center">${detailCell}</td>
         </tr>`;
     }).join('');
+
+    // Update action bar berdasarkan status all-locked
+    renderActionBar(allIndivLocked);
 }
 
 /* -------------------------------------------------------
@@ -529,7 +562,7 @@ function renderEmployees(employees) {
 ------------------------------------------------------- */
 async function markAttendance(empId, status) {
     if (todayLocked && !IS_ADMIN) {
-        showToast('Absensi sudah dikunci dan tidak dapat diubah.', 'error');
+        showToast('Absensi sudah dikunci oleh admin dan tidak dapat diubah.', 'error');
         return;
     }
     try {
@@ -537,11 +570,14 @@ async function markAttendance(empId, status) {
             method: 'POST',
             body: JSON.stringify({ employee_id: empId, status }),
         });
-        if (res && res.error) {
+        if (res && res.success === false) {
+            // Tampilkan pesan lock per-karyawan dari server
+            showToast(res.message || 'Absensi sudah terkunci.', 'error');
+        } else if (res && res.error) {
             showToast(res.error, 'error');
         } else {
             showToast(`Absensi: ${status}`);
-            loadEmployees();
+            loadEmployees(); // re-render dengan status terkunci
         }
     } catch(e) { console.error('markAttendance error:', e); }
 }

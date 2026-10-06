@@ -5,6 +5,11 @@ session_start();
 require_once 'config/database.php';
 checkRole(['admin']);
 
+// Ambil daftar kategori dari database untuk dropdown form
+$_db = getDB();
+$_catStmt = $_db->query('SELECT id, name FROM categories ORDER BY name ASC');
+$_categories = $_catStmt->fetchAll(PDO::FETCH_ASSOC);
+
 $pageTitle  = 'Inventaris Produk';
 $activePage = 'products';
 include 'templates/header.php';
@@ -110,14 +115,9 @@ include 'templates/sidebar.php';
                 <div>
                     <label class="block text-xs font-medium text-gray-500 mb-1">Kategori <span class="text-red-400">*</span></label>
                     <select id="prodKategori" class="input-field w-full">
-                        <option value="Makanan">Makanan</option>
-                        <option value="Minuman">Minuman</option>
-                        <option value="Snack">Snack</option>
-                        <option value="Sembako">Sembako</option>
-                        <option value="Skincare">Skincare</option>
-                        <option value="Elektronik">Elektronik</option>
-                        <option value="Obat-obatan">Obat-obatan</option>
-                        <option value="Lainnya" selected>Lainnya</option>
+                        <?php foreach ($_categories as $_cat): ?>
+                        <option value="<?= htmlspecialchars($_cat['name']) ?>"><?= htmlspecialchars($_cat['name']) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
 
@@ -389,6 +389,40 @@ include 'templates/sidebar.php';
 </div>
 
 <!-- ============================================================
+     MODAL DETAIL LOT FIFO
+     ============================================================ -->
+<div id="fifoModal" class="modal-overlay hidden">
+    <div class="modal-box max-w-2xl w-full mx-4 max-h-[85vh] flex flex-col">
+        <div class="flex items-center justify-between mb-4 flex-shrink-0">
+            <div>
+                <h3 class="text-lg font-bold text-gray-800">Detail Lot FIFO</h3>
+                <p class="text-xs text-gray-500" id="fifoProductName">—</p>
+            </div>
+            <button onclick="closeFifoModal()" class="text-gray-400 hover:text-gray-600 p-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="overflow-y-auto flex-1 min-h-0 border border-gray-100 rounded-xl">
+            <table class="w-full text-left border-collapse text-sm">
+                <thead class="bg-gray-50 sticky top-0">
+                    <tr>
+                        <th class="p-3 text-xs font-semibold text-gray-600">No</th>
+                        <th class="p-3 text-xs font-semibold text-gray-600">Tanggal Restock</th>
+                        <th class="p-3 text-xs font-semibold text-gray-600">Harga Modal (Rp)</th>
+                        <th class="p-3 text-xs font-semibold text-gray-600">Stok Awal</th>
+                        <th class="p-3 text-xs font-semibold text-gray-600">Sisa Stok</th>
+                        <th class="p-3 text-xs font-semibold text-gray-600">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="fifoTableBody">
+                    <tr><td colspan="6" class="text-center p-6 text-gray-400">Memuat data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
      JAVASCRIPT
      ============================================================ -->
 <script>
@@ -463,6 +497,11 @@ function renderTable(prods) {
                     <button onclick="openEditModal(${p.id})"
                         class="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors" title="Edit">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                    </button>
+                    <!-- FIFO -->
+                    <button onclick="openFifoModal(${p.id}, '${p.nama.replace(/'/g, "\\'")}')"
+                        class="p-1.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors" title="Detail Lot FIFO">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                     </button>
                     <!-- Hapus -->
                     <button onclick="openDeleteModal(${p.id}, '${p.nama.replace(/'/g, "\\'")}')"
@@ -853,13 +892,62 @@ function getCategoryEmoji(kat) {
     return map[kat] || '📦';
 }
 
+// ---- Modal FIFO ----
+async function openFifoModal(id, nama) {
+    document.getElementById('fifoProductName').textContent = nama;
+    document.getElementById('fifoTableBody').innerHTML = `<tr><td colspan="6" class="text-center p-6 text-gray-400">Memuat data...</td></tr>`;
+    document.getElementById('fifoModal').classList.remove('hidden');
+    
+    try {
+        const res = await apiFetch('api/products.php?action=fifo_details&id=' + id);
+        const data = res.data || [];
+        if (!data.length) {
+            document.getElementById('fifoTableBody').innerHTML = `<tr><td colspan="6" class="text-center p-6 text-gray-400">Belum ada riwayat stok masuk / restock</td></tr>`;
+            return;
+        }
+        
+        let foundActive = false;
+        document.getElementById('fifoTableBody').innerHTML = data.map((d, index) => {
+            let badge = '-';
+            const remaining = parseInt(d.remaining_qty);
+            if (remaining > 0) {
+                if (!foundActive) {
+                    badge = '<span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded">Aktif FIFO (Prioritas Keluar)</span>';
+                    foundActive = true;
+                } else {
+                    badge = '<span class="bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-0.5 rounded">Menunggu</span>';
+                }
+            } else {
+                badge = '<span class="text-gray-400 text-[10px]">Habis</span>';
+            }
+            
+            return `
+            <tr class="border-t border-gray-100 hover:bg-gray-50">
+                <td class="p-3 font-mono text-xs text-gray-500">#${index + 1}</td>
+                <td class="p-3 text-xs">${d.created_at || '-'} <span class="text-gray-300">(Lot #${d.id})</span></td>
+                <td class="p-3 font-semibold">${formatRupiah(d.buy_price)}</td>
+                <td class="p-3 text-center">${d.qty}</td>
+                <td class="p-3 text-center font-bold ${remaining > 0 ? 'text-blue-600' : 'text-gray-400'}">${remaining}</td>
+                <td class="p-3">${badge}</td>
+            </tr>`;
+        }).join('');
+    } catch(e) {
+        document.getElementById('fifoTableBody').innerHTML = `<tr><td colspan="6" class="text-center p-6 text-red-400">Gagal memuat data</td></tr>`;
+    }
+}
+
+function closeFifoModal() {
+    document.getElementById('fifoModal').classList.add('hidden');
+}
+
 // Close modal on overlay click
-['productModal','deleteModal','restockModal'].forEach(id => {
+['productModal','deleteModal','restockModal','fifoModal'].forEach(id => {
     document.getElementById(id)?.addEventListener('click', function(e) {
         if (e.target === this) {
             if (id === 'productModal')  closeModal();
             else if (id === 'deleteModal')  closeDeleteModal();
             else if (id === 'restockModal') closeRestockModal();
+            else if (id === 'fifoModal') closeFifoModal();
         }
     });
 });

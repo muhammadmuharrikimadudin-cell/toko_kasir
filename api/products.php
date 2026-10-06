@@ -34,6 +34,20 @@ match ($method) {
 
 function handleGet(PDO $db): never
 {
+    $action = inputString($_GET, 'action');
+    if ($action === 'fifo_details') {
+        $productId = inputInt($_GET, 'id');
+        $stmt = $db->prepare('
+            SELECT pd.id, p.created_at, pd.buy_price, pd.qty, pd.remaining_qty 
+            FROM purchase_details pd 
+            JOIN purchases p ON pd.purchase_id = p.id 
+            WHERE pd.product_id = :product_id 
+            ORDER BY p.created_at ASC, pd.id ASC
+        ');
+        $stmt->execute([':product_id' => $productId]);
+        jsonResponse(['data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    }
+
     $search = inputString($_GET, 'search');
     $limit  = max(1, inputInt($_GET, 'limit', 50));
     $page   = max(1, inputInt($_GET, 'page', 1));
@@ -140,6 +154,28 @@ function handlePost(PDO $db): never
             ':bp'    => $buyPrice,
             ':notes' => 'Stok awal produk baru',
         ]);
+        
+        $purchaseNo = 'PRC' . strtoupper(substr(uniqid(), -8));
+        $totalAmount = $initStock * $buyPrice;
+        $db->prepare(
+            'INSERT INTO purchases (purchase_number, total_amount, notes) VALUES (:no, :total, :notes)'
+        )->execute([
+            ':no'    => $purchaseNo,
+            ':total' => $totalAmount,
+            ':notes' => 'Stok awal: ' . inputString($data, 'nama'),
+        ]);
+        $purchaseId = (int)$db->lastInsertId();
+        
+        $db->prepare(
+            'INSERT INTO purchase_details (purchase_id, product_id, qty, buy_price, subtotal, remaining_qty) VALUES (:pid, :prod_id, :qty, :buy_price, :subtotal, :remaining_qty)'
+        )->execute([
+            ':pid'           => $purchaseId,
+            ':prod_id'       => $newProductId,
+            ':qty'           => $initStock,
+            ':buy_price'     => $buyPrice,
+            ':subtotal'      => $totalAmount,
+            ':remaining_qty' => $initStock,
+        ]);
     }
 
     jsonResponse(['success' => true, 'id' => $newProductId], 201);
@@ -169,12 +205,23 @@ function handlePut(PDO $db): never
     $newBuyPrice = inputFloat($data, 'harga_beli');
     $newStock    = inputInt($data, 'stok');
 
-    // Ambil stok lama untuk menghitung delta restock
-    $stmtOld = $db->prepare('SELECT stock, buy_price FROM products WHERE id = :id');
+    // Ambil data lama untuk menghitung delta restock dan update gambar
+    $stmtOld = $db->prepare('SELECT stock, buy_price, imageUrl FROM products WHERE id = :id');
     $stmtOld->execute([':id' => $id]);
-    $oldRow      = $stmtOld->fetch(PDO::FETCH_ASSOC) ?: ['stock' => 0, 'buy_price' => 0];
+    $oldRow      = $stmtOld->fetch(PDO::FETCH_ASSOC) ?: ['stock' => 0, 'buy_price' => 0, 'imageUrl' => null];
     $oldStock    = (int)$oldRow['stock'];
+    $oldImage    = $oldRow['imageUrl'];
     $stockDelta  = $newStock - $oldStock; // positif = restock masuk
+
+    $newImage = inputString($data, 'imageUrl') ?: null;
+    if ($newImage !== null && $oldImage !== null && $newImage !== $oldImage) {
+        if ($oldImage !== 'default.png' && $oldImage !== 'default.jpg') {
+            $filepath = __DIR__ . '/../uploads/' . $oldImage;
+            if (file_exists($filepath)) {
+                unlink($filepath);
+            }
+        }
+    }
 
     $stmt = $db->prepare(<<<SQL
         UPDATE products 
@@ -198,7 +245,7 @@ function handlePut(PDO $db): never
         ':sell_price'  => inputFloat($data, 'harga_jual'),
         ':stock'       => $newStock,
         ':min_stock'   => inputInt($data, 'min_stock', 5),
-        ':imageUrl'    => inputString($data, 'imageUrl') ?: null,
+        ':imageUrl'    => $newImage,
     ]);
 
     // Catat ke stock_logs jika ada penambahan stok (restock)
@@ -212,6 +259,28 @@ function handlePut(PDO $db): never
             ':bp'    => $effectiveBuyPrice,
             ':notes' => 'Restock / update stok',
         ]);
+        
+        $purchaseNo = 'PRC' . strtoupper(substr(uniqid(), -8));
+        $totalAmount = $stockDelta * $effectiveBuyPrice;
+        $db->prepare(
+            'INSERT INTO purchases (purchase_number, total_amount, notes) VALUES (:no, :total, :notes)'
+        )->execute([
+            ':no'    => $purchaseNo,
+            ':total' => $totalAmount,
+            ':notes' => 'Update stok manual: ' . inputString($data, 'nama'),
+        ]);
+        $purchaseId = (int)$db->lastInsertId();
+        
+        $db->prepare(
+            'INSERT INTO purchase_details (purchase_id, product_id, qty, buy_price, subtotal, remaining_qty) VALUES (:pid, :prod_id, :qty, :buy_price, :subtotal, :remaining_qty)'
+        )->execute([
+            ':pid'           => $purchaseId,
+            ':prod_id'       => $id,
+            ':qty'           => $stockDelta,
+            ':buy_price'     => $effectiveBuyPrice,
+            ':subtotal'      => $totalAmount,
+            ':remaining_qty' => $stockDelta,
+        ]);
     }
 
     jsonResponse(['success' => true]);
@@ -223,6 +292,18 @@ function handleDelete(PDO $db): never
     if ($id <= 0) {
         jsonResponse(data: ['error' => 'ID tidak valid'], statusCode: 400);
     }
+
+    $stmtImg = $db->prepare('SELECT imageUrl FROM products WHERE id = :id');
+    $stmtImg->execute([':id' => $id]);
+    $imageName = $stmtImg->fetchColumn();
+
+    if ($imageName && $imageName !== 'default.png' && $imageName !== 'default.jpg') {
+        $filepath = __DIR__ . '/../uploads/' . $imageName;
+        if (file_exists($filepath)) {
+            unlink($filepath);
+        }
+    }
+
     $stmt = $db->prepare('DELETE FROM products WHERE id = :id');
     $stmt->execute([':id' => $id]);
     jsonResponse(['success' => true]);
@@ -293,6 +374,19 @@ function handleRestock(PDO $db): never
             ':no'    => $purchaseNo,
             ':total' => $totalAmount,
             ':notes' => "Restock: {$product['name']} × {$jumlah} unit @ Rp" . number_format($hargaBeli, 0, ',', '.') . ($catatan !== 'Restock stok' ? " | {$catatan}" : ''),
+        ]);
+        $purchaseId = (int)$db->lastInsertId();
+
+        // 4. Catat ke purchase_details
+        $db->prepare(
+            'INSERT INTO purchase_details (purchase_id, product_id, qty, buy_price, subtotal, remaining_qty) VALUES (:pid, :prod_id, :qty, :buy_price, :subtotal, :remaining_qty)'
+        )->execute([
+            ':pid'           => $purchaseId,
+            ':prod_id'       => $id,
+            ':qty'           => $jumlah,
+            ':buy_price'     => $hargaBeli,
+            ':subtotal'      => $totalAmount,
+            ':remaining_qty' => $jumlah,
         ]);
 
         $db->commit();

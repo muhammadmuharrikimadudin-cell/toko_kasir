@@ -162,8 +162,8 @@ include 'templates/sidebar.php';
     <!-- ===== TAB: CASHIER ===== -->
     <div id="tab-cashier" class="tab-content hidden">
         <!-- Stat Cards Cashier -->
-        <div class="grid grid-cols-2 gap-4 mb-6" id="statsCashier">
-            <?php for ($i = 0; $i < 4; $i++): ?>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6" id="statsCashier">
+            <?php for ($i = 0; $i < 6; $i++): ?>
             <div class="stat-card animate-pulse">
                 <div class="h-4 bg-gray-100 rounded w-1/2 mb-3"></div>
                 <div class="h-7 bg-gray-100 rounded w-full mb-2"></div>
@@ -171,25 +171,18 @@ include 'templates/sidebar.php';
             <?php endfor; ?>
         </div>
 
-        <!-- Year Selling Activity -->
-        <div class="bg-white rounded-2xl shadow-sm p-5 mb-4">
+        <!-- Interactive Selling Activity Chart -->
+        <div class="bg-white rounded-2xl shadow-sm p-5 mb-6">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="font-semibold text-gray-800">Aktivitas Penjualan Tahunan</h2>
-                <span class="text-xs text-gray-400">Tahunan ▾</span>
+                <h2 class="font-semibold text-gray-800" id="sellChartTitle">Aktivitas Penjualan (Harian)</h2>
+                <select id="sellChartFilter" class="input-field text-sm w-32 py-1 px-2 h-auto" onchange="updateSellChart()">
+                    <option value="daily_sales">Harian</option>
+                    <option value="monthly_sales">Bulanan</option>
+                    <option value="yearly_sales">Tahunan</option>
+                </select>
             </div>
-            <div class="chart-container" style="height:220px">
-                <canvas id="yearSellChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Daily Selling Activity -->
-        <div class="bg-white rounded-2xl shadow-sm p-5">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="font-semibold text-gray-800">Aktivitas Penjualan Harian</h2>
-                <span class="text-xs text-gray-400">Harian ▾</span>
-            </div>
-            <div class="chart-container" style="height:220px">
-                <canvas id="dailySellChart"></canvas>
+            <div class="chart-container" style="height:250px">
+                <canvas id="unifiedSellChart"></canvas>
             </div>
         </div>
     </div>
@@ -241,8 +234,8 @@ include 'templates/sidebar.php';
 let dailyChartInst    = null;
 let yearlyChartInst   = null;
 let monthlyChartInst  = null;
-let yearSellChartInst = null;
-let dailySellChartInst= null;
+let unifiedSellChartInst = null;
+let sellChartData = null;
 
 let currentTab = 'general';
 
@@ -393,12 +386,46 @@ function makeLineChart(id, labels, data, color, fill = false) {
             }},
             scales: {
                 x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 },
-                    callback: v => 'Rp' + (v >= 1e6 ? (v/1e6).toFixed(0)+'jt' : v >= 1e3 ? (v/1e3).toFixed(0)+'rb' : v)
-                }},
+                y: {
+                    grid: { color: '#f1f5f9' },
+                    beginAtZero: true,
+                    ticks: {
+                        font: { size: 10 },
+                        callback: v => {
+                            if (v >= 1e9) return 'Rp' + (v / 1e9).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'M';
+                            if (v >= 1e6) return 'Rp' + (v / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'jt';
+                            if (v >= 1e3) return 'Rp' + (v / 1e3).toFixed(0) + 'rb';
+                            return 'Rp' + v;
+                        }
+                    }
+                },
             }
         }
     });
+}
+
+// ---- Update Unified Chart ----
+function updateSellChart() {
+    if (!sellChartData || !unifiedSellChartInst) return;
+    const filter = document.getElementById('sellChartFilter').value;
+    const titleEl = document.getElementById('sellChartTitle');
+    
+    let chartSrc = sellChartData[filter];
+    if (!chartSrc) return;
+    
+    if (filter === 'daily_sales') {
+        titleEl.textContent = 'Aktivitas Penjualan (Harian)';
+        unifiedSellChartInst.data.labels = chartSrc.labels.map(d => d.length > 5 ? d.slice(5) : d);
+    } else if (filter === 'monthly_sales') {
+        titleEl.textContent = 'Aktivitas Penjualan (Bulanan)';
+        unifiedSellChartInst.data.labels = chartSrc.labels;
+    } else if (filter === 'yearly_sales') {
+        titleEl.textContent = 'Aktivitas Penjualan (Tahunan)';
+        unifiedSellChartInst.data.labels = chartSrc.labels;
+    }
+    
+    unifiedSellChartInst.data.datasets[0].data = chartSrc.data;
+    unifiedSellChartInst.update();
 }
 
 // ---- Main Load ----
@@ -412,17 +439,17 @@ async function loadDashboard() {
 
         // ---- GENERAL TAB ----
         document.getElementById('statsGeneral').innerHTML = [
-            statCard('Laba Kotor Hari Ini',  formatRupiah(s.today_gross),    '', 'blue'),
-            statCard('Laba Bersih Hari Ini', formatRupiah(s.today_net),      '', 'green'),
-            statCard('Total Pengeluaran',    formatRupiah(s.today_spending), '', 'yellow'),
+            statCard('Laba Kotor Hari Ini',  formatRupiah(s.today_gross),    '', 'blue',   '', 'laba.php?filter=today'),
+            statCard('Laba Bersih Hari Ini', formatRupiah(s.today_net),      '', 'green',  '', 'laba.php?filter=today'),
+            statCard('Total Pengeluaran',    formatRupiah(s.today_spending), '', 'yellow', '', 'purchases.php'),
             stockAlertCard(s.stock_alert),
         ].join('');
 
         // Daily Chart
         if (dailyChartInst) { dailyChartInst.destroy(); }
         dailyChartInst = makeLineChart('dailyChart',
-            c.daily.labels.map(d => d.slice(5)),
-            c.daily.data, '#22c55e', true);
+            c.daily_sales.labels.map(d => d.length > 5 ? d.slice(5) : d),
+            c.daily_sales.data, '#22c55e', true);
 
         // Latest Transactions
         const tbody = document.getElementById('latestTrxBody');
@@ -481,20 +508,28 @@ async function loadDashboard() {
         // ---- CASHIER TAB ----
         const cs = s.cashier;
         document.getElementById('statsCashier').innerHTML = [
-            statCard('Laba Kotor Hari Ini',      formatRupiah(cs.today_gross || s.today_gross),  '', 'blue'),
-            statCard('Laba Bersih Hari Ini',        formatRupiah(cs.today_net   || s.today_net),    '', 'green'),
-            statCard('Laba Kotor Tahunan',     formatRupiah(cs.yearly_gross || 231560000),     '', 'yellow'),
-            statCard('Laba Bersih Penjualan Tahunan', formatRupiah(cs.yearly_net   || 125560000),     '', 'purple'),
+            statCard('Laba Kotor Hari Ini',           formatRupiah(cs.today_gross   || 0), '', 'blue',   '', 'laba.php?filter=today'),
+            statCard('Laba Bersih Hari Ini',          formatRupiah(cs.today_net     || 0), '', 'green',  '', 'laba.php?filter=today'),
+            statCard('Laba Kotor Bulan Ini',          formatRupiah(cs.monthly_gross || 0), '', 'blue',   '', 'laba.php?filter=month'),
+            statCard('Laba Bersih Bulan Ini',         formatRupiah(cs.monthly_net   || 0), '', 'green',  '', 'laba.php?filter=month'),
+            statCard('Laba Kotor Tahunan',            formatRupiah(cs.yearly_gross  || 0), '', 'yellow', '', 'laba.php?filter=year'),
+            statCard('Laba Bersih Penjualan Tahunan', formatRupiah(cs.yearly_net    || 0), '', 'purple', '', 'laba.php?filter=year'),
         ].join('');
 
         // Low stock data
         window._lowStockList = res.low_stock_list || [];
 
-        if (yearSellChartInst)  yearSellChartInst.destroy();
-        if (dailySellChartInst) dailySellChartInst.destroy();
-        // Grafik Aktivitas Penjualan Tahunan — dari omzet sales
-        yearSellChartInst  = makeLineChart('yearSellChart',  c.yearly_sales.labels, c.yearly_sales.data, '#22c55e', true);
-        dailySellChartInst = makeLineChart('dailySellChart', c.daily.labels.map(d => d.slice(5)), c.daily.data, '#22c55e', true);
+        sellChartData = c;
+        if (unifiedSellChartInst) unifiedSellChartInst.destroy();
+        
+        const filter = document.getElementById('sellChartFilter')?.value || 'daily_sales';
+        let initLabels = c[filter]?.labels || [];
+        if (filter === 'daily_sales') {
+            initLabels = initLabels.map(d => d.length > 5 ? d.slice(5) : d);
+        }
+        let initData = c[filter]?.data || [];
+
+        unifiedSellChartInst = makeLineChart('unifiedSellChart', initLabels, initData, '#22c55e', true);
 
     } catch (e) {
         console.error('Dashboard load error:', e);

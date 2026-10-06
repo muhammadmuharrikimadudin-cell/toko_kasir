@@ -16,12 +16,6 @@ include 'templates/sidebar.php';
      ============================================================ -->
 <div class="p-6 h-screen flex flex-col">
 
-    <!-- Page Header -->
-    <div class="mb-4">
-        <h1 class="text-xl font-bold text-gray-800">Point of Sale</h1>
-        <p class="text-sm text-gray-500">Buat Transaksi Penjualan Baru</p>
-    </div>
-
     <!-- POS Layout: Left (Catalog) + Right (Cart) -->
     <div class="flex gap-5 flex-1 overflow-hidden">
 
@@ -47,15 +41,15 @@ include 'templates/sidebar.php';
             </div>
 
             <!-- Product Grid -->
-            <div id="productGrid" class="grid grid-cols-4 gap-3 overflow-y-auto flex-1 pr-1 content-start">
+            <div id="productGrid" class="grid grid-cols-4 gap-4 overflow-y-auto flex-1 pr-2 content-start pb-4">
                 <!-- Skeleton loading -->
                 <?php for ($i = 0; $i < 8; $i++): ?>
-                <div class="product-card animate-pulse bg-white border rounded-xl shadow-sm h-full">
-                    <div class="bg-gray-100 aspect-square rounded-t-xl w-full"></div>
-                    <div class="p-2">
-                        <div class="mt-2 h-3 bg-gray-200 rounded w-3/4"></div>
-                        <div class="mt-1 h-3 bg-gray-200 rounded w-1/2"></div>
-                        <div class="mt-2 h-4 bg-gray-200 rounded w-2/3"></div>
+                <div class="pos-card flex flex-col bg-white border border-gray-100 rounded-2xl shadow-sm animate-pulse">
+                    <div class="bg-gray-200 h-32 w-full rounded-t-2xl"></div>
+                    <div class="p-3 flex-1 flex flex-col">
+                        <div class="mt-2 h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div class="mt-2 h-3 bg-gray-200 rounded w-1/2"></div>
+                        <div class="mt-4 h-5 bg-gray-200 rounded w-2/3 mt-auto"></div>
                     </div>
                 </div>
                 <?php endfor; ?>
@@ -207,14 +201,18 @@ include 'templates/sidebar.php';
                 <span class="text-gray-500">Nama Kasir</span>
                 <span id="modalKasir" class="font-medium text-gray-800">-</span>
             </div>
-            <div class="border-t border-gray-200 pt-2 mt-2">
+            <div class="border-t border-gray-200 pt-2 mt-2 space-y-1">
                 <div class="flex justify-between">
-                    <span class="text-gray-500">Amount</span>
+                    <span class="text-gray-500">Subtotal</span>
                     <span id="modalAmount" class="font-medium text-gray-800">-</span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-500">Diskon</span>
-                    <span id="modalDiskon" class="font-medium text-gray-800">-</span>
+                    <span class="text-gray-500" id="modalDiskonLabel">Diskon</span>
+                    <span id="modalDiskon" class="font-medium text-red-500">-</span>
+                </div>
+                <div class="flex justify-between font-bold pt-1 mt-1 border-t border-gray-100">
+                    <span class="text-gray-800">Total Bayar</span>
+                    <span id="modalGrandTotal" class="text-gray-800">-</span>
                 </div>
             </div>
             
@@ -232,9 +230,9 @@ include 'templates/sidebar.php';
 
         <!-- Actions -->
         <div class="flex gap-3">
-            <button onclick="getPDFReceipt()" class="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 flex items-center justify-center gap-2 transition-all">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                Get PDF Receipt
+            <button onclick="cetakStruk()" class="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 flex items-center justify-center gap-2 transition-all">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Cetak Struk
             </button>
             <button onclick="closeModal()" class="flex-1 py-3 rounded-xl font-semibold text-sm text-white transition-all" style="background:#4DB9F2;">
                 Transaksi Baru
@@ -281,23 +279,26 @@ function renderProductGrid(prods) {
     grid.innerHTML = prods.map(p => {
         const outOfStock = parseInt(p.stok) <= 0;
         const imgHtml = p.imageUrl
-            ? `<img src="${p.imageUrl}" class="object-cover w-full h-full" alt="${p.nama}" onerror="this.onerror=null; this.outerHTML='<div class=\\'flex items-center justify-center text-4xl w-full h-full bg-gray-50\\'>${getCategoryEmoji(p.kategori)}</div>';">`
-            : `<div class="flex items-center justify-center text-4xl w-full h-full bg-gray-50">${getCategoryEmoji(p.kategori)}</div>`;
+            ? `<img src="${p.imageUrl}" class="w-full h-full object-contain" alt="${p.nama}" onerror="this.onerror=null; this.outerHTML='<div class=\\'flex items-center justify-center text-3xl w-full h-full\\'>${getCategoryEmoji(p.kategori)}</div>';">`
+            : `<div class="flex items-center justify-center text-3xl w-full h-full">${getCategoryEmoji(p.kategori)}</div>`;
         return `
-        <div class="product-card relative ${outOfStock ? 'out-of-stock opacity-50' : ''}"
+        <div class="pos-card group flex flex-col bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-lg hover:border-blue-400 transition-all cursor-pointer relative ${outOfStock ? 'out-of-stock opacity-60' : ''}"
              id="prod-${p.id}" title="${outOfStock ? 'Stok habis' : 'Klik untuk tambah ke keranjang'}"
              onclick="${outOfStock ? '' : `addToCart(${p.id})`}">
-            <div class="h-full flex flex-col">
-                <div class="overflow-hidden rounded-t-xl bg-gray-50 aspect-square w-full flex items-center justify-center">
-                    ${imgHtml}
-                </div>
-                <div class="p-2 flex-1 flex flex-col">
-                    <p class="font-semibold text-gray-800 text-xs mt-1 leading-tight line-clamp-2">${p.nama}</p>
-                    <p class="text-gray-400 text-xs mt-0.5 truncate">${p.kategori || 'Lainnya'}</p>
-                    <div class="mt-auto pt-1">
-                        <p class="text-blue-500 font-bold text-xs w-full truncate" title="${formatRupiah(p.harga_jual)}">${formatRupiah(p.harga_jual)}</p>
-                        ${outOfStock ? '<span class="text-red-400 text-xs font-medium">Stok Habis</span>' : `<span class="text-gray-400 text-xs">Stok: ${p.stok}</span>`}
-                    </div>
+            
+            <div class="w-full flex-shrink-0 bg-slate-50 rounded-t-2xl relative overflow-hidden" style="aspect-ratio:4/3">
+                ${imgHtml}
+                ${outOfStock ? '<div class="absolute inset-0 bg-black/10 flex items-center justify-center rounded-t-2xl"><span class="bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded">HABIS</span></div>' : ''}
+            </div>
+
+            
+            <div class="px-2.5 pt-2 pb-2.5 flex-1 flex flex-col min-w-0">
+                <p class="font-semibold text-gray-800 text-[11px] leading-tight truncate" title="${p.nama}">${p.nama}</p>
+                <p class="text-[10px] text-gray-400 mt-0.5 truncate">${p.kategori || 'Lainnya'}</p>
+                
+                <div class="mt-auto pt-1.5 flex items-center justify-between gap-1 min-w-0">
+                    <p class="font-black text-[11px] truncate min-w-0" style="color:#4DB9F2">${formatRupiah(p.harga_jual)}</p>
+                    ${!outOfStock ? `<div class="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded font-bold border border-blue-100 flex-shrink-0">Stok: ${p.stok}</div>` : ''}
                 </div>
             </div>
         </div>`;
@@ -331,7 +332,9 @@ function clearSearch() {
 function addToCart(productId) {
     const p = products.find(p => p.id == productId);
     if (!p) return;
-    const existing = cart.find(c => c.id == productId);
+    
+    let existing = cart.find(c => c.id == productId);
+    
     if (existing) {
         if (existing.qty >= parseInt(p.stok)) {
             alert('Stok tidak mencukupi');
@@ -339,7 +342,8 @@ function addToCart(productId) {
         }
         existing.qty++;
     } else {
-        cart.push({ ...p, qty: 1 });
+        const cartId = productId + '-' + Date.now();
+        cart.push({ ...p, qty: 1, cartId: cartId });
     }
     renderCart();
     
@@ -351,8 +355,8 @@ function addToCart(productId) {
     }
 }
 
-function updateQty(productId, delta) {
-    const idx = cart.findIndex(c => c.id == productId);
+function updateQty(cartId, delta) {
+    const idx = cart.findIndex(c => (c.cartId || c.id) == cartId);
     if (idx === -1) return;
     
     const item = cart[idx];
@@ -371,8 +375,8 @@ function updateQty(productId, delta) {
     renderCart();
 }
 
-function removeFromCart(productId) {
-    cart = cart.filter(c => c.id != productId);
+function removeFromCart(cartId) {
+    cart = cart.filter(c => (c.cartId || c.id) != cartId);
     renderCart();
 }
 
@@ -411,15 +415,17 @@ function renderCart() {
             ? `<img src="${item.imageUrl}" class="w-8 h-8 rounded-lg object-cover flex-shrink-0" onerror="this.onerror=null; this.outerHTML='<div class=\\'w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-base flex-shrink-0\\'>${getCategoryEmoji(item.kategori)}</div>';">`
             : `<div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-base flex-shrink-0">${getCategoryEmoji(item.kategori)}</div>`;
             
+        const cartId = item.cartId || item.id;
+            
         return `
-        <div class="cart-item border-b border-gray-100 pb-3 mb-3" id="cart-${item.id}">
+        <div class="cart-item border-b border-gray-100 pb-3 mb-3" id="cart-${cartId}">
             <div class="flex items-start gap-2">
                 ${imgHtml}
                 <div class="flex-1 min-w-0">
                     <p class="text-xs font-semibold text-gray-800 leading-tight">${item.nama}</p>
                     <p class="text-xs text-gray-400">${formatRupiah(item.harga_jual)}</p>
                 </div>
-                <button onclick="removeFromCart(${item.id})" class="text-gray-300 hover:text-red-400 transition-colors p-0.5">
+                <button onclick="removeFromCart('${cartId}')" class="text-gray-300 hover:text-red-400 transition-colors p-0.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
@@ -427,9 +433,9 @@ function renderCart() {
             </div>
             <div class="flex items-center justify-between mt-2 pl-10">
                 <div class="flex items-center gap-2">
-                    <button class="qty-btn px-2 py-0.5 bg-gray-100 rounded text-xs font-bold" onclick="updateQty(${item.id}, -1)">−</button>
+                    <button class="qty-btn px-2 py-0.5 bg-gray-100 rounded text-xs font-bold" onclick="updateQty('${cartId}', -1)">−</button>
                     <span class="text-sm font-bold w-5 text-center">${item.qty}</span>
-                    <button class="qty-btn px-2 py-0.5 bg-gray-100 rounded text-xs font-bold" onclick="updateQty(${item.id}, 1)">+</button>
+                    <button class="qty-btn px-2 py-0.5 bg-gray-100 rounded text-xs font-bold" onclick="updateQty('${cartId}', 1)">+</button>
                 </div>
                 <span class="text-sm font-bold text-gray-800">${formatRupiah(item.harga_jual * item.qty)}</span>
             </div>
@@ -521,7 +527,7 @@ async function prosesPayment() {
         });
 
         if (result.success) {
-            lastTrx = result;
+            lastTrx = { ...result, items: [...cart] };
             showPaymentModal(result);
             cart = [];
             renderCart();
@@ -543,8 +549,21 @@ function showPaymentModal(data) {
     document.getElementById('modalTime')?.replaceChildren(document.createTextNode(data.created_at || '-'));
     document.getElementById('modalMethod')?.replaceChildren(document.createTextNode(data.metode_bayar || '-'));
     document.getElementById('modalKasir')?.replaceChildren(document.createTextNode(data.kasir || '-'));
-    document.getElementById('modalAmount')?.replaceChildren(document.createTextNode('IDR ' + parseInt(data.total || 0).toLocaleString('id-ID')));
-    document.getElementById('modalDiskon')?.replaceChildren(document.createTextNode((data.diskon || 0) + '%'));
+    
+    const subtotal = data.total || 0;
+    const diskonNominal = (subtotal * (data.diskon || 0)) / 100;
+    
+    document.getElementById('modalAmount')?.replaceChildren(document.createTextNode('IDR ' + parseInt(subtotal).toLocaleString('id-ID')));
+    
+    if (data.diskon > 0) {
+        document.getElementById('modalDiskonLabel')?.replaceChildren(document.createTextNode(`Diskon (${data.diskon}%)`));
+        document.getElementById('modalDiskon')?.replaceChildren(document.createTextNode(`- IDR ${parseInt(diskonNominal).toLocaleString('id-ID')}`));
+    } else {
+        document.getElementById('modalDiskonLabel')?.replaceChildren(document.createTextNode('Diskon (0%)'));
+        document.getElementById('modalDiskon')?.replaceChildren(document.createTextNode('-'));
+    }
+    
+    document.getElementById('modalGrandTotal')?.replaceChildren(document.createTextNode('IDR ' + parseInt(data.total_bayar).toLocaleString('id-ID')));
     
     const cashWrapper = document.getElementById('modalCashWrapper');
     if (data.metode_bayar === 'Cash') {
@@ -567,41 +586,13 @@ document.getElementById('paymentModal')?.addEventListener('click', function(e) {
     if (e.target === this) closeModal();
 });
 
-// ---- PDF Receipt ----
-function getPDFReceipt() {
-    if (!lastTrx) return;
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'mm', format: [80, 140] });
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('KASIR TOKO', 40, 10, { align: 'center' });
-
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Point of Sale Receipt', 40, 15, { align: 'center' });
-    doc.line(5, 18, 75, 18);
-
-    doc.text(`Ref: ${lastTrx.kode_transaksi}`, 5, 23);
-    doc.text(`Waktu: ${lastTrx.created_at}`, 5, 28);
-    doc.text(`Kasir: ${lastTrx.kasir}`, 5, 33);
-    doc.text(`Metode: ${lastTrx.metode_bayar}`, 5, 38);
-    doc.line(5, 41, 75, 41);
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total:', 5, 46);
-    doc.text('IDR ' + parseInt(lastTrx.total_bayar).toLocaleString('id-ID'), 75, 46, { align: 'right' });
-
-    if (lastTrx.diskon > 0) {
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Diskon: ${lastTrx.diskon}%`, 5, 52);
+// ---- Print Receipt ----
+function cetakStruk() {
+    if (!lastTrx || !lastTrx.kode_transaksi) return;
+    const printWindow = window.open('receipt.php?id=' + lastTrx.kode_transaksi, '_blank', 'width=400,height=600');
+    if (printWindow) {
+        printWindow.focus();
     }
-
-    doc.line(5, 56, 75, 56);
-    doc.setFontSize(7);
-    doc.text('Terima kasih telah berbelanja!', 40, 61, { align: 'center' });
-
-    doc.save(`Receipt-${lastTrx.kode_transaksi}.pdf`);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

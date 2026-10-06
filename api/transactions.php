@@ -49,9 +49,13 @@ if ($method === 'GET') {
             t.payment_method                 AS metode_bayar,
             'Complete'                       AS status,
             t.created_at,
+            (SELECT SUM(sd.buy_price * sd.qty) FROM sale_details sd WHERE sd.sale_id = t.id) AS total_hpp,
             (SELECT GROUP_CONCAT(CONCAT(sd.product_name, ' x', sd.qty) SEPARATOR ', ')
                FROM sale_details sd
               WHERE sd.sale_id = t.id)       AS product_nama,
+            (SELECT CONCAT('[', GROUP_CONCAT(JSON_OBJECT('name', sd.product_name, 'qty', sd.qty, 'hpp', sd.buy_price, 'subtotal', sd.subtotal)), ']')
+               FROM sale_details sd
+              WHERE sd.sale_id = t.id)       AS items_json,
             NULL                             AS product_foto
         FROM sales t
         {$where}
@@ -189,7 +193,53 @@ try {
             throw new RuntimeException("Stok tidak cukup untuk produk: {$prodName}");
         }
 
-        // 2. Insert detail (Trigger DB akan otomatis mengurangi stok & mencatat ke stock_logs)
+        // 2. Proses potong stok metode FIFO di tabel purchase_details
+        $qtyToDeduct = $qty;
+        $totalFifoCost = 0;
+        
+        // Ambil batch pembelian dari yang paling lama (FIFO) yang masih punya remaining_qty > 0
+        $stmtFifo = $db->prepare('
+            SELECT pd.id, pd.buy_price, pd.remaining_qty 
+            FROM purchase_details pd
+            JOIN purchases p ON pd.purchase_id = p.id
+            WHERE pd.product_id = :product_id AND pd.remaining_qty > 0 
+            ORDER BY p.created_at ASC, pd.id ASC FOR UPDATE
+        ');
+        $stmtFifo->execute([':product_id' => $productId]);
+        $purchaseDetails = $stmtFifo->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmtUpdateFifo = $db->prepare('UPDATE purchase_details SET remaining_qty = :remaining_qty WHERE id = :id');
+
+        foreach ($purchaseDetails as $pd) {
+            if ($qtyToDeduct <= 0) break;
+
+            $avail = (int)$pd['remaining_qty'];
+            $cost  = (float)$pd['buy_price'];
+            if ($avail >= $qtyToDeduct) {
+                $stmtUpdateFifo->execute([
+                    ':remaining_qty' => $avail - $qtyToDeduct,
+                    ':id'            => $pd['id']
+                ]);
+                $totalFifoCost += $qtyToDeduct * $cost;
+                $qtyToDeduct = 0;
+            } else {
+                $stmtUpdateFifo->execute([
+                    ':remaining_qty' => 0,
+                    ':id'            => $pd['id']
+                ]);
+                $totalFifoCost += $avail * $cost;
+                $qtyToDeduct -= $avail;
+            }
+        }
+        
+        if ($qtyToDeduct > 0) {
+            $totalFifoCost += $qtyToDeduct * $buyPrice; // fallback to master price
+        }
+        
+        // Update $buyPrice dengan blended cost FIFO
+        $buyPrice = $totalFifoCost / $qty;
+
+        // 3. Insert detail (Trigger DB akan otomatis mengurangi stok & mencatat ke stock_logs)
         $stmtDetail->execute([
             ':sale_id'         => $saleId,
             ':product_id'      => $productId,

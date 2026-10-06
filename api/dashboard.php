@@ -162,21 +162,42 @@ $yearlySpendData = array_map(
 );
 
 // ================================================================
-// 9. CHART TAHUNAN — Omzet penjualan per bulan
+// 9. CHART BULANAN — Omzet penjualan per bulan
 // ================================================================
-$stmtYearlySales = $db->prepare(<<<SQL
+$stmtMonthlySales = $db->prepare(<<<SQL
     SELECT MONTH(created_at) AS bulan,
            COALESCE(SUM(grand_total), 0) AS total
     FROM sales
     WHERE YEAR(created_at) = :year
     GROUP BY MONTH(created_at)
 SQL);
-$stmtYearlySales->execute([':year' => $selectedYear]);
-$yearlySalesRaw  = $stmtYearlySales->fetchAll(PDO::FETCH_KEY_PAIR);
-$yearlySalesData = array_map(
-    fn(int $m): float => (float)($yearlySalesRaw[$m] ?? 0),
+$stmtMonthlySales->execute([':year' => $selectedYear]);
+$monthlySalesRaw  = $stmtMonthlySales->fetchAll(PDO::FETCH_KEY_PAIR);
+$monthlySalesData = array_map(
+    fn(int $m): float => (float)($monthlySalesRaw[$m] ?? 0),
     range(1, 12)
 );
+
+// ================================================================
+// 9b. CHART TAHUNAN — Omzet penjualan 5 tahun terakhir
+// ================================================================
+$stmtYearlySalesList = $db->prepare(<<<SQL
+    SELECT YEAR(created_at) AS tahun,
+           COALESCE(SUM(grand_total), 0) AS total
+    FROM sales
+    WHERE YEAR(created_at) >= :start_year AND YEAR(created_at) <= :end_year
+    GROUP BY YEAR(created_at)
+    ORDER BY tahun ASC
+SQL);
+$startYear = $selectedYear - 4;
+$stmtYearlySalesList->execute([':start_year' => $startYear, ':end_year' => $selectedYear]);
+$yearlySalesRawList = $stmtYearlySalesList->fetchAll(PDO::FETCH_KEY_PAIR);
+$yearlySalesDataList = [];
+$yearlySalesLabels = [];
+for ($y = $startYear; $y <= $selectedYear; $y++) {
+    $yearlySalesLabels[] = (string)$y;
+    $yearlySalesDataList[] = (float)($yearlySalesRawList[$y] ?? 0);
+}
 
 // ================================================================
 // 10. INVENTORY STATS
@@ -243,9 +264,35 @@ $stmtCashierYear->execute([':year' => $selectedYear]);
 $cashierRow   = $stmtCashierYear->fetch(PDO::FETCH_ASSOC) ?: [];
 $yearlyGross  = (float)($cashierRow['yearly_gross'] ?? 0);
 $yearlyHpp    = (float)($cashierRow['yearly_hpp']   ?? 0);
+
+// ================================================================
+// 13b. CASHIER STATS — Bulanan (Laba Kotor & Laba Bersih dari penjualan)
+// ================================================================
+$stmtCashierMonth = $db->prepare(<<<SQL
+    SELECT
+        COALESCE(SUM(s.grand_total), 0)                                                   AS monthly_gross,
+        COALESCE(SUM(
+            sd.qty * COALESCE(NULLIF(sd.buy_price, 0), p.buy_price, 0)
+        ), 0)                                                                              AS monthly_hpp
+    FROM sales s
+    JOIN sale_details sd ON sd.sale_id = s.id
+    JOIN products     p  ON p.id       = sd.product_id
+    WHERE YEAR(s.created_at) = :year AND MONTH(s.created_at) = :month
+SQL);
+$stmtCashierMonth->execute([
+    ':year'  => $selectedYear,
+    ':month' => (int)date('m')
+]);
+$cashierMonthRow = $stmtCashierMonth->fetch(PDO::FETCH_ASSOC) ?: [];
+$monthlyGross = (float)($cashierMonthRow['monthly_gross'] ?? 0);
+$monthlyHpp   = (float)($cashierMonthRow['monthly_hpp']   ?? 0);
+$monthlyNet   = $monthlyGross - $monthlyHpp;
+
 $cashierStats = [
     'today_gross'   => (float)($cashierRow['today_gross'] ?? 0),
     'today_net'     => $todayNet,
+    'monthly_gross' => $monthlyGross,
+    'monthly_net'   => $monthlyNet,
     'yearly_gross'  => $yearlyGross,
     'yearly_hpp'    => $yearlyHpp,
     // Laba Bersih = Laba Kotor - HPP barang terjual
@@ -278,7 +325,7 @@ jsonResponse([
     // Riwayat restock terbaru (untuk modal detail pengeluaran)
     'recent_purchases'    => $recentPurchases,
     'chart' => [
-        'daily' => [
+        'daily_sales' => [
             'labels' => array_keys($chartData),
             'data'   => array_values($chartData),
         ],
@@ -288,9 +335,14 @@ jsonResponse([
             'data'   => $yearlySpendData,
         ],
         // Omzet penjualan per bulan (untuk Tab Kasir)
-        'yearly_sales' => [
+        'monthly_sales' => [
             'labels' => ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],
-            'data'   => $yearlySalesData,
+            'data'   => $monthlySalesData,
+        ],
+        // Omzet penjualan 5 tahun terakhir
+        'yearly_sales' => [
+            'labels' => $yearlySalesLabels,
+            'data'   => $yearlySalesDataList,
         ],
     ],
 ]);

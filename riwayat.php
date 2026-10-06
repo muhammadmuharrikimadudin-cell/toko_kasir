@@ -200,15 +200,49 @@ function renderPagination(total, pages) {
 }
 
 function showDetail(t) {
+    const labaBersih = t.total_bayar - (t.total_hpp || 0);
+    
+    let itemsHtml = '';
+    try {
+        if (t.items_json) {
+            const items = JSON.parse(t.items_json);
+            itemsHtml = items.map(i => `
+                <div class="flex justify-between border-b border-gray-100 py-1">
+                    <div>
+                        <p class="text-xs font-semibold text-gray-700">${i.name}</p>
+                        <p class="text-[10px] text-gray-400">${i.qty} x ${formatRupiah(i.subtotal/i.qty)}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs font-bold text-gray-800">${formatRupiah(i.subtotal)}</p>
+                        <p class="text-[10px] text-green-600">HPP FIFO: ${formatRupiah(i.hpp * i.qty)}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch(e) {}
+
     document.getElementById('detailContent').innerHTML = `
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 gap-3 mb-3">
             <div><p class="text-gray-400 text-xs">ID Transaksi</p><p class="font-bold font-mono text-blue-600">${t.kode_transaksi}</p></div>
             <div><p class="text-gray-400 text-xs">Status</p>${statusBadge(t.status)}</div>
             <div><p class="text-gray-400 text-xs">Tanggal</p><p class="font-medium">${t.created_at?.slice(0,16) || '-'}</p></div>
             <div><p class="text-gray-400 text-xs">Metode Bayar</p>${methodBadge(t.metode_bayar)}</div>
             <div><p class="text-gray-400 text-xs">Sub Total</p><p class="font-medium">${formatRupiah(t.total)}</p></div>
             <div><p class="text-gray-400 text-xs">Diskon</p><p class="font-medium">${t.diskon ?? 0}%</p></div>
-            <div class="col-span-2 bg-blue-50 rounded-xl p-3"><p class="text-gray-400 text-xs">Total Bayar</p><p class="font-bold text-xl text-blue-600">${formatRupiah(t.total_bayar)}</p></div>
+            <div class="col-span-2 bg-blue-50 rounded-xl p-3">
+                <div class="flex justify-between items-center mb-1">
+                    <p class="text-gray-500 text-xs">Total Bayar</p>
+                    <p class="font-bold text-lg text-blue-600">${formatRupiah(t.total_bayar)}</p>
+                </div>
+                <div class="flex justify-between items-center">
+                    <p class="text-gray-500 text-xs">Laba Bersih</p>
+                    <p class="font-bold text-sm text-green-600">${formatRupiah(labaBersih)}</p>
+                </div>
+            </div>
+        </div>
+        <div class="border-t border-gray-100 pt-2 max-h-48 overflow-y-auto pr-1">
+            <p class="text-xs font-bold text-gray-500 mb-2">Item Details & HPP</p>
+            ${itemsHtml}
         </div>
     `;
     document.getElementById('detailModal').classList.remove('hidden');
