@@ -13,6 +13,7 @@ if (!isset($pageTitle)) $pageTitle = 'Kasir Toko';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Aplikasi Kasir Toko - Point of Sale modern berbasis web">
     <title><?= htmlspecialchars($pageTitle) ?> — Kasir Toko</title>
+    <link rel="icon" href="data:,">
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -42,7 +43,7 @@ if (!isset($pageTitle)) $pageTitle = 'Kasir Toko';
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/assets/css/custom.css">
+    <link rel="stylesheet" href="assets/css/custom.css">
 </head>
 <body class="bg-gray-100">
 <!-- Layout Wrapper -->

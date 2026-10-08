@@ -101,15 +101,30 @@ if (($_SESSION['role'] ?? '') !== 'admin') {
     safeJson(['error' => 'Hanya admin yang dapat menyimpan transaksi.'], 403);
 }
 
-$input       = json_decode(file_get_contents('php://input'), true) ?? [];
-$items       = $input['items'] ?? [];
-$diskon      = (float)($input['diskon'] ?? 0);
-$metodeBayar = trim($input['metode_bayar'] ?? 'Cash');
-$cashTendered = (float)($input['cash_tendered'] ?? 0);
-$userId      = (int)$_SESSION['user_id'];
+$input = file_get_contents('php://input');
+$data = json_decode($input, true) ?? $_POST;
+$items = $data['items'] ?? [];
+$diskon = (float)($data['discount'] ?? 0);
+$metodeBayar = trim($data['payment_method'] ?? 'Cash');
 
-if (empty($items) || !is_array($items)) {
-    safeJson(['error' => 'Keranjang belanja kosong'], 422);
+$rawPaid = (string)($data['paid_amount'] ?? '');
+$rawTotal = (string)($data['total_amount'] ?? '');
+$cleanPaid = (float)preg_replace('/[^0-9.-]/', '', $rawPaid);
+$cleanTotal = (float)preg_replace('/[^0-9.-]/', '', $rawTotal);
+
+$cashTendered = !empty($cleanPaid) ? $cleanPaid : $cleanTotal;
+$userId = $_SESSION['user_id'] ?? 1;
+
+if (empty($items)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Keranjang kosong']);
+    exit;
+}
+
+if (empty($metodeBayar)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Parameter payment_method tidak ditemukan']);
+    exit;
 }
 
 // Map frontend value → DB enum (lowercase)
@@ -129,11 +144,12 @@ try {
     $discountAmount = $subtotal * $diskon / 100;
     $grandTotal     = $subtotal - $discountAmount;
     
-    $payAmount = $grandTotal;
-    $changeAmount = 0;
-    if ($pmEnum === 'cash' && $cashTendered >= $grandTotal) {
-        $payAmount = $cashTendered;
-        $changeAmount = $cashTendered - $grandTotal;
+    if ($pmEnum === 'qris' || $pmEnum === 'transfer') {
+        $payAmount = $cashTendered > 0 ? $cashTendered : $grandTotal;
+        $changeAmount = 0;
+    } else {
+        $payAmount = $cashTendered > 0 ? $cashTendered : $grandTotal;
+        $changeAmount = max(0, $payAmount - $grandTotal);
     }
 
     $invoiceNumber  = 'TRX-' . date('YmdHis') . '-' . rand(100, 999);
@@ -234,6 +250,13 @@ try {
         
         if ($qtyToDeduct > 0) {
             $totalFifoCost += $qtyToDeduct * $buyPrice; // fallback to master price
+            
+            // Fallback pengurangan langsung di tabel products
+            $stmtUpdateStockFallback = $db->prepare('UPDATE products SET stock = stock - :qty WHERE id = :id');
+            $stmtUpdateStockFallback->execute([
+                ':qty' => $qtyToDeduct,
+                ':id'  => $productId
+            ]);
         }
         
         // Update $buyPrice dengan blended cost FIFO
@@ -276,11 +299,15 @@ try {
     if ($db->inTransaction()) {
         $db->rollBack();
     }
-    safeJson(['error' => $e->getMessage()], 400);
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    exit;
 
 } catch (\Throwable $e) {
     if ($db->inTransaction()) {
         $db->rollBack();
     }
-    safeJson(['error' => 'Transaksi gagal: ' . $e->getMessage()], 500);
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Transaksi gagal: ' . $e->getMessage()]);
+    exit;
 }

@@ -105,7 +105,7 @@ async function loadPurchases() {
     const search = document.getElementById('searchTrx').value;
     const tbody  = document.getElementById('trxTableBody');
     try {
-        const res = await apiFetch(`/api/purchases.php?search=${encodeURIComponent(search)}&page=${currentPage}&limit=10`);
+        const res = await apiFetch(`api/purchases.php?search=${encodeURIComponent(search)}&page=${currentPage}&limit=10`);
         allData    = res.data  ?? [];
         totalPages = res.pages ?? 1;
         renderTable(allData);

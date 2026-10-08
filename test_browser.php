@@ -11,7 +11,7 @@ require_once 'config/database.php';
 <script>
 async function test() {
     try {
-        const res = await fetch('/api/employees.php');
+        const res = await fetch('api/employees.php');
         const text = await res.text();
         document.getElementById('out').textContent = text;
         

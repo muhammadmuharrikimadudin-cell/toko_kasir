@@ -461,7 +461,7 @@ async function unlockAttendance() {
 ------------------------------------------------------- */
 async function loadEmployees() {
     try {
-        const res = await apiFetch('/api/employees.php');
+        const res = await apiFetch('api/employees.php');
         renderEmployees(res && res.data ? res.data : []);
     } catch(e) {
         console.error('loadEmployees error:', e);

@@ -494,7 +494,10 @@ async function prosesPayment() {
         showToast('Hanya admin yang dapat menyimpan transaksi.', 'error');
         return;
     }
-    if (cart.length === 0) return;
+    if (cart.length === 0) {
+        showToast('Keranjang masih kosong', 'error');
+        return;
+    }
     const diskon = parseFloat(document.getElementById('discountInput')?.value || '0') || 0;
     const metode = document.getElementById('paymentMethod')?.value || 'Cash';
     
@@ -516,13 +519,29 @@ async function prosesPayment() {
     }
 
     try {
+        const cleanTotalAmount = parseFloat(total.toString().replace(/[^0-9.-]+/g, "")) || 0;
+        let cleanPaidAmount = parseFloat((cashVal || total).toString().replace(/[^0-9.-]+/g, "")) || 0;
+        if (metode !== 'Cash') cleanPaidAmount = cleanTotalAmount;
+        
+        const mappedCart = cart.map(item => ({
+            id: item.id || item.product_id,
+            product_id: item.id || item.product_id,
+            nama: item.nama || item.name,
+            qty: parseInt(item.qty),
+            price: parseFloat((item.price || item.harga_jual || 0).toString().replace(/[^0-9.-]+/g, "")) || 0,
+            harga_jual: parseFloat((item.harga_jual || item.price || 0).toString().replace(/[^0-9.-]+/g, "")) || 0,
+            harga_beli: parseFloat((item.harga_beli || item.buy_price || 0).toString().replace(/[^0-9.-]+/g, "")) || 0
+        }));
+
         const result = await apiFetch('api/transactions.php', {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                items: cart, 
-                diskon, 
-                metode_bayar: metode, 
-                cash_tendered: cashVal 
+                items: mappedCart, 
+                payment_method: metode, 
+                paid_amount: cleanPaidAmount,
+                discount: diskon,
+                total_amount: cleanTotalAmount
             }),
         });
 

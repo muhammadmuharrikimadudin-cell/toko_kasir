@@ -158,7 +158,7 @@ function methodBadge(m) {
 async function loadLaba() {
     const search = encodeURIComponent(document.getElementById('searchTrx').value);
     try {
-        const res = await apiFetch(`/api/laba.php?search=${search}&filter=${activeFilter}&page=${currentPage}&limit=15`);
+        const res = await apiFetch(`api/laba.php?search=${search}&filter=${activeFilter}&page=${currentPage}&limit=15`);
         allData    = res.data  ?? [];
         totalPages = res.pages ?? 1;
 

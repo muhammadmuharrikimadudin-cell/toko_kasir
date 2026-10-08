@@ -80,7 +80,7 @@ include 'templates/sidebar.php';
 <script>
 async function loadCategories() {
     try {
-        const res = await apiFetch('/api/categories.php');
+        const res = await apiFetch('api/categories.php');
         const tbody = document.getElementById('categoryTableBody');
         
         if (!res.data || res.data.length === 0) {
@@ -129,7 +129,7 @@ async function saveCategory(e) {
     btn.textContent = 'Menyimpan...';
 
     try {
-        const res = await apiFetch('/api/categories.php', {
+        const res = await apiFetch('api/categories.php', {
             method: 'POST',
             body: JSON.stringify({ name })
         });
@@ -158,7 +158,7 @@ async function deleteCategory(id, name, totalProducts) {
     if (!confirm(`Hapus kategori "${name}"?`)) return;
 
     try {
-        const res = await apiFetch(`/api/categories.php?id=${id}`, { method: 'DELETE' });
+        const res = await apiFetch(`api/categories.php?id=${id}`, { method: 'DELETE' });
         if (res.success) {
             showToast('Kategori terhapus', 'success');
             loadCategories();

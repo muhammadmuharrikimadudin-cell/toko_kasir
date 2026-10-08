@@ -432,7 +432,7 @@ function updateSellChart() {
 async function loadDashboard() {
     try {
         const year = document.getElementById('yearSelect')?.value || new Date().getFullYear();
-        const res  = await apiFetch(`/api/dashboard.php?year=${year}`);
+        const res  = await apiFetch(`api/dashboard.php?year=${year}`);
         if (!res || !res.stats) throw new Error("Invalid response");
         const s    = res.stats;
         const c    = res.chart;

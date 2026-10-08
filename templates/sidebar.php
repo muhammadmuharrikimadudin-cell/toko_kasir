@@ -5,13 +5,13 @@ if (!isset($activePage)) $activePage = 'dashboard';
 $user = getCurrentUser();
 
 $menuItems = [
-    'dashboard' => ['label' => 'Dashboard',           'icon' => 'home',     'href' => '/dashboard.php'],
-    'kasir'     => ['label' => 'Kasir / POS',          'icon' => 'cashier',  'href' => '/kasir.php'],
-    'products'  => ['label' => 'Inventaris',           'icon' => 'box',      'href' => '/products.php'],
-    'riwayat'   => ['label' => 'Riwayat Transaksi',   'icon' => 'clock',    'href' => '/riwayat.php'],
-    'employee'  => ['label' => 'Karyawan',             'icon' => 'users',    'href' => '/employee.php'],
-    'users'     => ['label' => 'Manajemen Akun',       'icon' => 'shield',   'href' => '/users.php'],
-    'settings'  => ['label' => 'Pengaturan',           'icon' => 'settings', 'href' => '/settings.php'],
+    'dashboard' => ['label' => 'Dashboard',           'icon' => 'home',     'href' => 'dashboard.php'],
+    'kasir'     => ['label' => 'Kasir / POS',          'icon' => 'cashier',  'href' => 'kasir.php'],
+    'products'  => ['label' => 'Inventaris',           'icon' => 'box',      'href' => 'products.php'],
+    'riwayat'   => ['label' => 'Riwayat Transaksi',   'icon' => 'clock',    'href' => 'riwayat.php'],
+    'employee'  => ['label' => 'Karyawan',             'icon' => 'users',    'href' => 'employee.php'],
+    'users'     => ['label' => 'Manajemen Akun',       'icon' => 'shield',   'href' => 'users.php'],
+    'settings'  => ['label' => 'Pengaturan',           'icon' => 'settings', 'href' => 'settings.php'],
 ];
 
 $userRole = $user['role'] ?? '';
@@ -76,7 +76,7 @@ $icons = [
 
     <!-- Quit Button -->
     <div class="p-4 border-t border-white/20">
-        <a href="/logout.php"
+        <a href="logout.php"
            class="sidebar-logout flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/15 rounded-xl transition-all text-sm font-medium"
            title="Logout">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
