@@ -361,7 +361,7 @@ document.getElementById('lowStockModal').addEventListener('click', function(e) {
 });
 
 // ---- Chart helpers ----
-function makeLineChart(id, labels, data, color, fill = false) {
+function makeLineChart(id, labels, data, color, fill = false, label = '') {
     const ctx = document.getElementById(id);
     if (!ctx) return null;
     return new Chart(ctx, {
@@ -369,6 +369,7 @@ function makeLineChart(id, labels, data, color, fill = false) {
         data: {
             labels,
             datasets: [{
+                label: label || 'Nilai',
                 data,
                 borderColor: color,
                 backgroundColor: fill ? color + '22' : 'transparent',
@@ -381,9 +382,12 @@ function makeLineChart(id, labels, data, color, fill = false) {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: {
-                callbacks: { label: ctx => ' ' + formatRupiah(ctx.raw) }
-            }},
+            plugins: { 
+                legend: { display: false }, 
+                tooltip: {
+                    callbacks: { label: ctx => ' ' + (ctx.dataset.label ? ctx.dataset.label + ': ' : '') + formatRupiah(ctx.raw) }
+                }
+            },
             scales: {
                 x: { grid: { display: false }, ticks: { font: { size: 10 } } },
                 y: {
@@ -392,10 +396,10 @@ function makeLineChart(id, labels, data, color, fill = false) {
                     ticks: {
                         font: { size: 10 },
                         callback: v => {
-                            if (v >= 1e9) return 'Rp' + (v / 1e9).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'M';
-                            if (v >= 1e6) return 'Rp' + (v / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + 'jt';
-                            if (v >= 1e3) return 'Rp' + (v / 1e3).toFixed(0) + 'rb';
-                            return 'Rp' + v;
+                            if (v >= 1e9) return 'Rp ' + (v / 1e9).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' M';
+                            if (v >= 1e6) return 'Rp ' + (v / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' Jt';
+                            if (v >= 1e3) return 'Rp ' + (v / 1e3).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' Rb';
+                            return 'Rp ' + v.toLocaleString('id-ID');
                         }
                     }
                 },
@@ -403,6 +407,7 @@ function makeLineChart(id, labels, data, color, fill = false) {
         }
     });
 }
+
 
 // ---- Update Unified Chart ----
 function updateSellChart() {
@@ -445,11 +450,11 @@ async function loadDashboard() {
             stockAlertCard(s.stock_alert),
         ].join('');
 
-        // Daily Chart
+        // Daily Chart (Show Laba Harian to match top cards)
         if (dailyChartInst) { dailyChartInst.destroy(); }
         dailyChartInst = makeLineChart('dailyChart',
             c.daily_sales.labels.map(d => d.length > 5 ? d.slice(5) : d),
-            c.daily_sales.data, '#22c55e', true);
+            c.daily_sales.profit, '#22c55e', true, 'Laba Harian');
 
         // Latest Transactions
         const tbody = document.getElementById('latestTrxBody');
@@ -501,9 +506,9 @@ async function loadDashboard() {
         if (yearlyChartInst)  yearlyChartInst.destroy();
         if (monthlyChartInst) monthlyChartInst.destroy();
         // Grafik Pengeluaran Tahunan — dari restock stock_logs
-        yearlyChartInst  = makeLineChart('yearlyChart',  c.yearly_spend.labels, c.yearly_spend.data, '#ef4444', true);
+        yearlyChartInst  = makeLineChart('yearlyChart',  c.yearly_spend.labels, c.yearly_spend.data, '#ef4444', true, 'Pengeluaran Tahunan');
         // Grafik Pengeluaran Bulanan — sama sumber, tampilan bar per bulan
-        monthlyChartInst = makeLineChart('monthlyChart', c.yearly_spend.labels, c.yearly_spend.data, '#f97316', true);
+        monthlyChartInst = makeLineChart('monthlyChart', c.yearly_spend.labels, c.yearly_spend.data, '#f97316', true, 'Pengeluaran Bulanan');
 
         // ---- CASHIER TAB ----
         const cs = s.cashier;
@@ -529,7 +534,7 @@ async function loadDashboard() {
         }
         let initData = c[filter]?.data || [];
 
-        unifiedSellChartInst = makeLineChart('unifiedSellChart', initLabels, initData, '#22c55e', true);
+        unifiedSellChartInst = makeLineChart('unifiedSellChart', initLabels, initData, '#3b82f6', true, 'Total Omset Penjualan');
 
     } catch (e) {
         console.error('Dashboard load error:', e);

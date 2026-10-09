@@ -44,8 +44,16 @@ include 'templates/sidebar.php';
             >
         </div>
 
+        <!-- Period Filter -->
+        <div class="flex items-center gap-2">
+            <button id="filterAll"   onclick="setFilter('')"       class="filter-btn active px-3 py-2 rounded-xl text-xs font-semibold transition-all bg-blue-500 text-white">Semua</button>
+            <button id="filterToday" onclick="setFilter('today')"  class="filter-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all bg-gray-100 text-gray-600 hover:bg-gray-200">Hari Ini</button>
+            <button id="filterMonth" onclick="setFilter('month')"  class="filter-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all bg-gray-100 text-gray-600 hover:bg-gray-200">Bulan Ini</button>
+            <button id="filterYear"  onclick="setFilter('year')"   class="filter-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all bg-gray-100 text-gray-600 hover:bg-gray-200">Tahun Ini</button>
+        </div>
+
         <!-- Export Buttons -->
-        <button onclick="exportExcel()" class="flex items-center gap-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-xl text-sm font-semibold transition-all">
+        <button onclick="exportExcel()" class="flex items-center gap-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-xl text-sm font-semibold transition-all ml-auto">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             Excel
         </button>
@@ -94,6 +102,24 @@ let searchTimer = null;
 let currentPage = 1;
 let totalPages  = 1;
 let allData     = [];
+let activeFilter = '';
+
+function setFilter(f) {
+    activeFilter = f;
+    currentPage  = 1;
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('bg-blue-500', 'text-white');
+        btn.classList.add('bg-gray-100', 'text-gray-600', 'hover:bg-gray-200');
+    });
+    const ids = { '': 'filterAll', 'today': 'filterToday', 'month': 'filterMonth', 'year': 'filterYear' };
+    const active = document.getElementById(ids[f]);
+    if (active) {
+        active.classList.add('bg-blue-500', 'text-white');
+        active.classList.remove('bg-gray-100', 'text-gray-600', 'hover:bg-gray-200');
+    }
+    loadPurchases();
+}
 
 function debounceSearch() {
     clearTimeout(searchTimer);
@@ -105,7 +131,7 @@ async function loadPurchases() {
     const search = document.getElementById('searchTrx').value;
     const tbody  = document.getElementById('trxTableBody');
     try {
-        const res = await apiFetch(`api/purchases.php?search=${encodeURIComponent(search)}&page=${currentPage}&limit=10`);
+        const res = await apiFetch(`api/purchases.php?search=${encodeURIComponent(search)}&filter=${activeFilter}&page=${currentPage}&limit=10`);
         allData    = res.data  ?? [];
         totalPages = res.pages ?? 1;
         renderTable(allData);
@@ -177,6 +203,10 @@ function exportExcel() {
     showToast('Excel berhasil diunduh');
 }
 
-// ---- Init ----
-loadPurchases();
+// ---- Init — baca filter dari URL ?filter= ----
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    const f = params.get('filter') || '';
+    setFilter(f);
+})();
 </script>

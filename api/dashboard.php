@@ -18,6 +18,11 @@ if (empty($_SESSION['user_id'])) {
 $db = getDB();
 
 // -----------------------------------------------
+// Set Timezone to Asia/Jakarta
+// -----------------------------------------------
+$db->exec("SET time_zone = '+07:00';");
+
+// -----------------------------------------------
 // Tahun yang dipilih (default = tahun sekarang)
 // -----------------------------------------------
 $selectedYear = (int)($_GET['year'] ?? date('Y'));
@@ -30,14 +35,20 @@ if ($selectedYear < 2000 || $selectedYear > 2100) {
 // ================================================================
 $stmtToday = $db->prepare(<<<SQL
     SELECT
-        COALESCE(SUM(s.grand_total), 0)                                        AS gross,
-        COALESCE(SUM(
-            sd.qty * COALESCE(NULLIF(sd.buy_price, 0), p.buy_price, 0)
-        ), 0)                                                                    AS hpp
-    FROM sales s
-    JOIN sale_details sd ON sd.sale_id = s.id
-    JOIN products     p  ON p.id       = sd.product_id
-    WHERE DATE(s.created_at) = CURDATE()
+        COALESCE(SUM(t.grand_total), 0) AS gross,
+        COALESCE(SUM(t.hpp), 0) AS hpp
+    FROM (
+        SELECT 
+            s.grand_total,
+            COALESCE(SUM(
+                sd.qty * COALESCE(NULLIF(sd.buy_price, 0), p.buy_price, 0)
+            ), 0) AS hpp
+        FROM sales s
+        LEFT JOIN sale_details sd ON sd.sale_id = s.id
+        LEFT JOIN products p ON p.id = sd.product_id
+        WHERE DATE(s.created_at) = CURDATE()
+        GROUP BY s.id, s.grand_total
+    ) t
 SQL);
 $stmtToday->execute();
 $todayRow   = $stmtToday->fetch(PDO::FETCH_ASSOC) ?: ['gross' => 0, 'hpp' => 0];
@@ -122,26 +133,35 @@ $stmtLog->execute();
 $stockLog = $stmtLog->fetchAll(PDO::FETCH_ASSOC);
 
 // ================================================================
-// 7. CHART HARIAN — 14 hari terakhir (omzet penjualan)
+// 7. CHART HARIAN — 14 hari terakhir (omzet penjualan dan laba)
 // ================================================================
 $stmtChart = $db->prepare(<<<SQL
-    SELECT DATE(created_at) AS tgl,
-           COALESCE(SUM(grand_total), 0) AS total
-    FROM sales
-    WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
-    GROUP BY DATE(created_at)
+    SELECT DATE(s.created_at) AS tgl,
+           COALESCE(SUM(s.grand_total), 0) AS sales,
+           COALESCE(SUM(s.grand_total), 0) - COALESCE(SUM(
+               (SELECT COALESCE(SUM(sd.qty * COALESCE(NULLIF(sd.buy_price, 0), p.buy_price, 0)), 0)
+                FROM sale_details sd
+                JOIN products p ON sd.product_id = p.id
+                WHERE sd.sale_id = s.id)
+           ), 0) AS profit
+    FROM sales s
+    WHERE DATE(s.created_at) >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
+    GROUP BY DATE(s.created_at)
     ORDER BY tgl ASC
 SQL);
 $stmtChart->execute();
 $chartRaw = $stmtChart->fetchAll(PDO::FETCH_ASSOC);
 
-$chartData = [];
+$chartDataSales = [];
+$chartDataProfit = [];
 for ($i = 13; $i >= 0; $i--) {
-    $date             = date('Y-m-d', strtotime("-{$i} days"));
-    $chartData[$date] = 0.0;
+    $date = date('Y-m-d', strtotime("-{$i} days"));
+    $chartDataSales[$date] = 0.0;
+    $chartDataProfit[$date] = 0.0;
 }
 foreach ($chartRaw as $row) {
-    $chartData[$row['tgl']] = (float)$row['total'];
+    $chartDataSales[$row['tgl']] = (float)$row['sales'];
+    $chartDataProfit[$row['tgl']] = (float)$row['profit'];
 }
 
 // ================================================================
@@ -250,15 +270,22 @@ $recentPurchases = $stmtRecentPurchases->fetchAll(PDO::FETCH_ASSOC);
 // ================================================================
 $stmtCashierYear = $db->prepare(<<<SQL
     SELECT
-        COALESCE(SUM(CASE WHEN DATE(s.created_at) = CURDATE() THEN s.grand_total END), 0) AS today_gross,
-        COALESCE(SUM(s.grand_total), 0)                                                   AS yearly_gross,
-        COALESCE(SUM(
-            sd.qty * COALESCE(NULLIF(sd.buy_price, 0), p.buy_price, 0)
-        ), 0)                                                                              AS yearly_hpp
-    FROM sales s
-    JOIN sale_details sd ON sd.sale_id = s.id
-    JOIN products     p  ON p.id       = sd.product_id
-    WHERE YEAR(s.created_at) = :year
+        COALESCE(SUM(CASE WHEN t.is_today = 1 THEN t.grand_total END), 0) AS today_gross,
+        COALESCE(SUM(t.grand_total), 0) AS yearly_gross,
+        COALESCE(SUM(t.hpp), 0) AS yearly_hpp
+    FROM (
+        SELECT 
+            s.grand_total,
+            CASE WHEN DATE(s.created_at) = CURDATE() THEN 1 ELSE 0 END AS is_today,
+            COALESCE(SUM(
+                sd.qty * COALESCE(NULLIF(sd.buy_price, 0), p.buy_price, 0)
+            ), 0) AS hpp
+        FROM sales s
+        LEFT JOIN sale_details sd ON sd.sale_id = s.id
+        LEFT JOIN products p ON p.id = sd.product_id
+        WHERE YEAR(s.created_at) = :year
+        GROUP BY s.id, s.grand_total, s.created_at
+    ) t
 SQL);
 $stmtCashierYear->execute([':year' => $selectedYear]);
 $cashierRow   = $stmtCashierYear->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -270,19 +297,23 @@ $yearlyHpp    = (float)($cashierRow['yearly_hpp']   ?? 0);
 // ================================================================
 $stmtCashierMonth = $db->prepare(<<<SQL
     SELECT
-        COALESCE(SUM(s.grand_total), 0)                                                   AS monthly_gross,
-        COALESCE(SUM(
-            sd.qty * COALESCE(NULLIF(sd.buy_price, 0), p.buy_price, 0)
-        ), 0)                                                                              AS monthly_hpp
-    FROM sales s
-    JOIN sale_details sd ON sd.sale_id = s.id
-    JOIN products     p  ON p.id       = sd.product_id
-    WHERE YEAR(s.created_at) = :year AND MONTH(s.created_at) = :month
+        COALESCE(SUM(t.grand_total), 0) AS monthly_gross,
+        COALESCE(SUM(t.hpp), 0) AS monthly_hpp
+    FROM (
+        SELECT 
+            s.grand_total,
+            COALESCE(SUM(
+                sd.qty * COALESCE(NULLIF(sd.buy_price, 0), p.buy_price, 0)
+            ), 0) AS hpp
+        FROM sales s
+        LEFT JOIN sale_details sd ON sd.sale_id = s.id
+        LEFT JOIN products p ON p.id = sd.product_id
+        WHERE MONTH(s.created_at) = MONTH(CURRENT_DATE()) 
+          AND YEAR(s.created_at) = YEAR(CURRENT_DATE())
+        GROUP BY s.id, s.grand_total
+    ) t
 SQL);
-$stmtCashierMonth->execute([
-    ':year'  => $selectedYear,
-    ':month' => (int)date('m')
-]);
+$stmtCashierMonth->execute();
 $cashierMonthRow = $stmtCashierMonth->fetch(PDO::FETCH_ASSOC) ?: [];
 $monthlyGross = (float)($cashierMonthRow['monthly_gross'] ?? 0);
 $monthlyHpp   = (float)($cashierMonthRow['monthly_hpp']   ?? 0);
@@ -326,8 +357,9 @@ jsonResponse([
     'recent_purchases'    => $recentPurchases,
     'chart' => [
         'daily_sales' => [
-            'labels' => array_keys($chartData),
-            'data'   => array_values($chartData),
+            'labels' => array_keys($chartDataSales),
+            'data'   => array_values($chartDataSales),
+            'profit' => array_values($chartDataProfit),
         ],
         // Pengeluaran Restock per bulan — sumber: purchases (untuk Tab Inventaris)
         'yearly_spend' => [

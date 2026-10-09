@@ -15,14 +15,27 @@ $page   = (int)($_GET['page'] ?? 1);
 $limit  = (int)($_GET['limit'] ?? 10);
 $search = trim($_GET['search'] ?? '');
 
+$filter = trim($_GET['filter'] ?? '');
+
 $offset = ($page - 1) * $limit;
 
-$whereSql = '';
-$params   = [];
+$where = [];
+$params = [];
+
 if ($search !== '') {
-    $whereSql = "WHERE pr.purchase_number LIKE :search OR pr.notes LIKE :search";
+    $where[] = "(pr.purchase_number LIKE :search OR pr.notes LIKE :search)";
     $params[':search'] = "%{$search}%";
 }
+
+if ($filter === 'today') {
+    $where[] = "DATE(pr.created_at) = CURDATE()";
+} elseif ($filter === 'month') {
+    $where[] = "YEAR(pr.created_at) = YEAR(CURDATE()) AND MONTH(pr.created_at) = MONTH(CURDATE())";
+} elseif ($filter === 'year') {
+    $where[] = "YEAR(pr.created_at) = YEAR(CURDATE())";
+}
+
+$whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
 $countStmt = $db->prepare("SELECT COUNT(*) FROM purchases pr {$whereSql}");
 $countStmt->execute($params);

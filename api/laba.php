@@ -84,14 +84,20 @@ $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // ---- Summary totals ----
 $sumSql = <<<SQL
     SELECT
-        COALESCE(SUM(s.grand_total), 0)                                    AS total_gross,
-        COALESCE(SUM(
-            sd.qty * COALESCE(NULLIF(sd.buy_price, 0), p.buy_price, 0)
-        ), 0)                                                               AS total_hpp
-    FROM sales s
-    LEFT JOIN sale_details sd ON sd.sale_id = s.id
-    LEFT JOIN products     p  ON p.id       = sd.product_id
-    {$whereSql}
+        COALESCE(SUM(t.grand_total), 0) AS total_gross,
+        COALESCE(SUM(t.hpp), 0)         AS total_hpp
+    FROM (
+        SELECT 
+            s.grand_total,
+            COALESCE(SUM(
+                sd.qty * COALESCE(NULLIF(sd.buy_price, 0), p.buy_price, 0)
+            ), 0) AS hpp
+        FROM sales s
+        LEFT JOIN sale_details sd ON sd.sale_id = s.id
+        LEFT JOIN products     p  ON p.id       = sd.product_id
+        {$whereSql}
+        GROUP BY s.id, s.grand_total
+    ) t
 SQL;
 $sumStmt = $db->prepare($sumSql);
 foreach ($params as $k => $v) {
