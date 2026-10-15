@@ -169,45 +169,21 @@ function handlePost(PDO $db, string $action): never
             jsonResponse(data: ['error' => 'Status tidak valid'], statusCode: 422);
         }
 
-        // Cek lock hanya untuk non-admin
-        if (!$isAdmin) {
-            // 1. Global day lock (cek attendance_lock_log)
-            if (isDateLocked($db)) {
-                jsonResponse(
-                    data: ['success' => false, 'message' => 'Absensi hari ini sudah dikunci oleh admin.'],
-                    statusCode: 403
-                );
-            }
-
-            // 2. Per-employee lock: cek apakah record sudah ada DAN is_locked = 1
-            $chk = $db->prepare(
-                'SELECT COALESCE(is_locked, 0) FROM attendance WHERE employee_id = :emp_id AND tanggal = CURDATE()'
+        // Cek global lock — berlaku untuk semua role
+        if (isDateLocked($db)) {
+            jsonResponse(
+                data: ['success' => false, 'message' => 'Absensi hari ini sudah dikunci oleh admin.'],
+                statusCode: 403
             );
-            $chk->execute([':emp_id' => $empId]);
-            $rowLocked = $chk->fetchColumn();
-            if ($rowLocked !== false && (int)$rowLocked === 1) {
-                jsonResponse(
-                    data: ['success' => false, 'message' => 'Absensi untuk hari ini sudah tersimpan dan terkunci.'],
-                    statusCode: 403
-                );
-            }
         }
 
-        // Admin: upsert tanpa mengubah status kunci (is_locked tetap seperti sebelumnya).
-        // Non-admin: insert/update dan kunci (is_locked = 1).
-        if ($isAdmin) {
-            $stmt = $db->prepare(<<<SQL
-                INSERT INTO attendance (employee_id, tanggal, status, is_locked)
-                VALUES (:emp_id, CURDATE(), :status, 0)
-                ON DUPLICATE KEY UPDATE status = VALUES(status)
-            SQL);
-        } else {
-            $stmt = $db->prepare(<<<SQL
-                INSERT INTO attendance (employee_id, tanggal, status, is_locked)
-                VALUES (:emp_id, CURDATE(), :status, 1)
-                ON DUPLICATE KEY UPDATE status = VALUES(status), is_locked = 1
-            SQL);
-        }
+        // Upsert absensi — is_locked TIDAK di-set otomatis.
+        // Kunci hanya dilakukan admin via action=lock.
+        $stmt = $db->prepare(<<<SQL
+            INSERT INTO attendance (employee_id, tanggal, status, is_locked)
+            VALUES (:emp_id, CURDATE(), :status, 0)
+            ON DUPLICATE KEY UPDATE status = VALUES(status)
+        SQL);
 
         $stmt->execute([':emp_id' => $empId, ':status' => $status]);
         jsonResponse(['success' => true]);

@@ -324,10 +324,10 @@ async function checkLockStatus() {
 /* -------------------------------------------------------
    Render action bar (bottom of card)
 ------------------------------------------------------- */
-function renderActionBar(allIndivLocked = false) {
+function renderActionBar() {
     const bar = document.getElementById('attendanceActionBar');
 
-    // Prioritas 1: global lock (admin sudah klik Simpan Absensi)
+    // Absensi sudah dikunci oleh admin
     if (todayLocked) {
         bar.innerHTML = `
             <span class="badge-day-locked">
@@ -346,26 +346,7 @@ function renderActionBar(allIndivLocked = false) {
         return;
     }
 
-    // Prioritas 2: semua karyawan sudah diinput secara per-individu
-    if (allIndivLocked) {
-        bar.innerHTML = `
-            <button class="save-attendance-btn" disabled style="opacity:.65;cursor:not-allowed;">
-                <svg style="width:15px;height:15px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-                </svg>
-                ✓ Absensi Hari Ini Sudah Selesai &amp; Terkunci
-            </button>
-            ${IS_ADMIN ? `<button class="unlock-attendance-btn" onclick="unlockAttendance()" id="btn-unlock-attendance">
-                <svg style="width:14px;height:14px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
-                </svg>
-                Edit Absensi (Admin)
-            </button>` : ''}
-        `;
-        return;
-    }
-
-    // Prioritas 3: belum semua terkunci
+    // Belum dikunci — tampilkan tombol simpan (admin) atau info
     if (IS_ADMIN) {
         bar.innerHTML = `
             <button class="save-attendance-btn" onclick="saveAttendance()" id="btn-save-attendance">
@@ -476,19 +457,17 @@ function renderEmployees(employees) {
             <p class="text-3xl mb-2">👥</p>
             <p>Belum ada data karyawan</p>
         </td></tr>`;
-        renderActionBar(false);
+        renderActionBar();
         return;
     }
 
-    // Cek apakah SEMUA karyawan sudah terkunci (per-individu)
-    const allIndivLocked = employees.length > 0 && employees.every(e => e.is_locked === true);
 
     const lockIcon = `<svg style="width:12px;height:12px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Absensi dikunci">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
     </svg>`;
 
     tbody.innerHTML = employees.map((emp, i) => {
-        const attStatus  = emp.attendance_status;
+        const attStatus   = emp.attendance_status;
         const isEmpLocked = emp.is_locked === true || todayLocked;
 
         let detailCell;
@@ -553,8 +532,8 @@ function renderEmployees(employees) {
         </tr>`;
     }).join('');
 
-    // Update action bar berdasarkan status all-locked
-    renderActionBar(allIndivLocked);
+    // Update action bar
+    renderActionBar();
 }
 
 /* -------------------------------------------------------
